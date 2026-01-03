@@ -14,12 +14,13 @@ import (
 	"strings"
 	"time"
 
+	"plarix-action/internal/action"
 	"plarix-action/internal/ledger"
 	"plarix-action/internal/pricing"
 	"plarix-action/internal/proxy"
 )
 
-const version = "0.3.0"
+const version = "0.4.0"
 
 func main() {
 	if len(os.Args) < 2 {
@@ -160,8 +161,24 @@ func runCmd(args []string) error {
 
 	// Output based on comment mode
 	if *commentMode == "summary" || *commentMode == "both" {
-		writeStepSummary(report)
+		if err := action.WriteStepSummary(report); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to write step summary: %v\n", err)
+		}
 	}
+
+	// Post PR comment if in PR context
+	if *commentMode == "pr" || *commentMode == "both" {
+		if pr := action.GetPRInfo(); pr != nil {
+			if err := action.PostComment(pr, report); err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: failed to post PR comment: %v\n", err)
+			} else {
+				fmt.Println("Posted/updated PR comment")
+			}
+		} else {
+			fmt.Println("Not in PR context, skipping PR comment")
+		}
+	}
+
 	fmt.Println(report)
 
 	// Check cost threshold
@@ -263,23 +280,4 @@ func generateReport(s ledger.Summary, pricesAsOf string) string {
 		version, pricesAsOf, time.Now().UTC().Format("2006-01-02 15:04 UTC")))
 
 	return b.String()
-}
-
-func writeStepSummary(content string) {
-	summaryPath := os.Getenv("GITHUB_STEP_SUMMARY")
-	if summaryPath == "" {
-		return
-	}
-
-	f, err := os.OpenFile(summaryPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: could not write step summary: %v\n", err)
-		return
-	}
-	defer f.Close()
-
-	if !strings.HasSuffix(content, "\n") {
-		content += "\n"
-	}
-	f.WriteString(content)
 }

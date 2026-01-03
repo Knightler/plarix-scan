@@ -2,6 +2,15 @@
 
 All notable changes to Plarix Scan will be documented in this file.
 
+## [0.4.0] - 2026-01-03
+
+### Added
+- `internal/action` package: GitHub Actions integration with PR comment upsert
+- Marker-based comment idempotency (`<!-- plarix-scan -->`)
+- Step Summary writing via action package
+- PR context detection from GitHub event payload
+- Graceful handling of non-PR events (skips comment, keeps summary)
+
 ## [0.3.0] - 2026-01-03
 
 ### Added
