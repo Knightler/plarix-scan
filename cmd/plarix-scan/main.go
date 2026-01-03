@@ -234,16 +234,16 @@ func runUserCommand(command string, envVars map[string]string) error {
 func generateReport(s ledger.Summary, pricesAsOf string) string {
 	var b strings.Builder
 
-	b.WriteString(fmt.Sprintf("## 💰 Plarix Scan Cost Report\n\n"))
-	b.WriteString(fmt.Sprintf("**Total Known Cost:** $%.4f USD\n", s.TotalKnownCostUSD))
-	b.WriteString(fmt.Sprintf("**Calls Observed:** %d\n", s.TotalCalls))
-	b.WriteString(fmt.Sprintf("**Tokens:** %d in / %d out\n\n", s.TotalInputTokens, s.TotalOutputTokens))
+	b.WriteString("## 💰 Plarix Scan Cost Report\n\n")
+	fmt.Fprintf(&b, "**Total Known Cost:** $%.4f USD\n", s.TotalKnownCostUSD)
+	fmt.Fprintf(&b, "**Calls Observed:** %d\n", s.TotalCalls)
+	fmt.Fprintf(&b, "**Tokens:** %d in / %d out\n\n", s.TotalInputTokens, s.TotalOutputTokens)
 
 	if s.UnknownCostCalls > 0 {
-		b.WriteString(fmt.Sprintf("⚠️ **Unknown Cost Calls:** %d\n", s.UnknownCostCalls))
+		fmt.Fprintf(&b, "⚠️ **Unknown Cost Calls:** %d\n", s.UnknownCostCalls)
 		if len(s.UnknownReasons) > 0 {
 			for reason, count := range s.UnknownReasons {
-				b.WriteString(fmt.Sprintf("  - %s: %d\n", reason, count))
+				fmt.Fprintf(&b, "  - %s: %d\n", reason, count)
 			}
 		}
 		b.WriteString("\n")
@@ -263,8 +263,8 @@ func generateReport(s ledger.Summary, pricesAsOf string) string {
 			if count >= 6 {
 				break
 			}
-			b.WriteString(fmt.Sprintf("| %s | %d | %d / %d | $%.4f |\n",
-				model, stats.Calls, stats.InputTokens, stats.OutputTokens, stats.KnownCostUSD))
+			fmt.Fprintf(&b, "| %s | %d | %d / %d | $%.4f |\n",
+				model, stats.Calls, stats.InputTokens, stats.OutputTokens, stats.KnownCostUSD)
 			count++
 		}
 		b.WriteString("\n")
@@ -276,8 +276,8 @@ func generateReport(s ledger.Summary, pricesAsOf string) string {
 	}
 
 	// Footer
-	b.WriteString(fmt.Sprintf("\n---\n*Plarix Scan v%s | Prices as of %s | %s*\n",
-		version, pricesAsOf, time.Now().UTC().Format("2006-01-02 15:04 UTC")))
+	fmt.Fprintf(&b, "\n---\n*Plarix Scan v%s | Prices as of %s | %s*\n",
+		version, pricesAsOf, time.Now().UTC().Format("2006-01-02 15:04 UTC"))
 
 	return b.String()
 }
