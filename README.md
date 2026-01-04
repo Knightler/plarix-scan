@@ -1,16 +1,16 @@
-# Plarix Scan
+# Plarix Scan (GitHub Action)
 
 **Free CI cost recorder for LLM API usage.**
-Records tokens and costs from *real* provider responses (no estimation).
+Records tokens and costs from *real* provider responses (no estimation) during your workflow.
 
-## Use Cases
-- **CI/CD**: Block PRs that exceed cost allowance.
-- **Local Dev**: Measure cost of running your test suite.
-- **Production**: Monitor LLM sidecar traffic via Docker.
+## Features
+- **Accurate**: Uses official `usage` fields from OpenAI/Anthropic/OpenRouter.
+- **Real-time**: Intercepts traffic during `run`, ensuring even streaming responses are captured.
+- **Zero-Config**: Works with standard env vars (`OPENAI_BASE_URL` injection). (Note: Requires your SDK to respect base URL overrides).
 
 ---
 
-## Quick Start (GitHub Action)
+## Quick Start via GitHub Action
 
 Add this to your `.github/workflows/cost.yml`:
 
@@ -27,106 +27,67 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - uses: plarix-ai/scan@v1
+      - uses: plarix-ai/scan@v0.6.0
         with:
-          command: "pytest -v" # Your test command
+          command: "pytest -v" # The command that runs your LLM tests
           fail_on_cost_usd: 1.0 # Optional: fail if > $1.00
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
 
-## How It Works in 3 Steps
-1. **Starts a Proxy** on `localhost`.
-2. **Injects Env Vars** (e.g. `OPENAI_BASE_URL`) so your SDK routes traffic to the proxy.
-3. **Records Usage** from the actual API response body before passing it back to your app.
+## How It Works
+1. **Wraps** your command (`pytest`, `npm test`, etc.).
+2. **Injects** local proxy variables (e.g. `OPENAI_BASE_URL=http://127.0.0.1:port/openai`).
+3. **Intercepts** traffic to extract token usage from response bodies.
+4. **Calculates** cost using a bundled, versioned pricing table.
+5. **Reports** results via PR comment and Job Summary.
 
-### Supported Providers
-The proxy sets these environment variables:
+### Supported Environmental Overrides
+Plarix Scan automatically sets these. Your tests/app must pick them up:
 
-| Provider | Env Var Injected | Notes |
-|----------|------------------|-------|
-| **OpenAI** | `OPENAI_BASE_URL` | Chat Completions + Responses |
-| **Anthropic** | `ANTHROPIC_BASE_URL` | Messages API |
-| **OpenRouter**| `OPENROUTER_BASE_URL` | OpenAI-compatible endpoint |
-
-> **Requirement**: Your LLM SDK must respect these standard environment variables or allow configuring the `base_url`.
+| Env Var | Target Provider |
+|---------|-----------------|
+| `OPENAI_BASE_URL` | OpenAI |
+| `ANTHROPIC_BASE_URL` | Anthropic |
+| `OPENROUTER_BASE_URL` | OpenRouter |
 
 ---
 
-## Output Files
-
-Artifacts are written to the working directory:
+## Artifacts & Outputs
 
 ### `plarix-ledger.jsonl`
-One entry per API call.
+A JSONL file containing every intercepted request.
 ```json
-{"ts":"2026-01-04T12:00:00Z","provider":"openai","model":"gpt-4o","input_tokens":50,"output_tokens":120,"cost_usd":0.001325,"cost_known":true}
+{"ts":"...","provider":"openai","model":"gpt-4o","input_tokens":50,"output_tokens":120,"cost_usd":0.001325,"cost_known":true}
 ```
 
 ### `plarix-summary.json`
-Aggregated totals.
+Aggregated statistics used for the report.
 ```json
 {
   "total_calls": 5,
-  "total_known_cost_usd": 0.045,
-  "model_breakdown": {
-    "gpt-4o": {"calls": 5, "known_cost_usd": 0.045}
-  }
+  "total_known_cost_usd": 0.045
 }
 ```
 
 ---
 
-## Usage Guide
+## Accuracy Contract
 
-### 1. Local Development
-Run the binary to wrap your test command:
-
-```bash
-# Build (or download)
-go build -o plarix-scan ./cmd/plarix-scan
-
-# Run
-./plarix-scan run --command "npm test"
-```
-
-### 2. Production (Docker Sidecar)
-Run Plarix as a long-lived proxy sidecar.
-
-**docker-compose.yaml:**
-```yaml
-services:
-  plarix:
-    image: plarix-scan:latest # (Build locally provided Dockerfile)
-    ports:
-      - "8080:8080"
-    volumes:
-      - ./ledgers:/data
-    command: proxy --port 8080 --ledger /data/plarix-ledger.jsonl
-
-  app:
-    image: my-app
-    environment:
-      - OPENAI_BASE_URL=http://plarix:8080/openai
-      - ANTHROPIC_BASE_URL=http://plarix:8080/anthropic
-```
-
-### 3. CI Configuration
-
-**Inputs:**
-- `command` (Required): The command to execute.
-- `fail_on_cost_usd` (Optional): Exit code 1 if cost exceeded.
-- `pricing_file` (Optional): Path to custom `prices.json`.
-- `enable_openai_stream_usage_injection` (Optional, default `false`): Forces usage reporting for OpenAI streams.
+1.  **Strict Usage Reporting**: We only calculate cost if the provider returns a valid `usage` field.
+2.  **No Estimation**: We do not count tokens ourselves (tokenizer-free). If usage is missing, cost is `UNKNOWN`.
+3.  **Real Pricing**: We use a snapshot of pricing data (Jan 4, 2026). If a model is not found, cost is `UNKNOWN`.
+4.  **Streaming**: We parse SSE streams to find usage chunks (e.g., OpenAI `stream_options`).
 
 ---
 
-## Accuracy Guarantee
+## Local Development (Testing the Action)
 
-Plarix Scan prioritizes **correctness over estimation**.
-- **Provider Reported**: We ONLY record costs if the provider returns usage fields (e.g., `usage: { prompt_tokens: ... }`).
-- **Real Streaming**: We intercept streaming bodies to parse usage chunks (e.g. OpenAI `stream_options`).
-- **Unknown Models**: If a model is not in our pricing table, we record usage but mark cost as **Unknown**. We do not guess.
+To verify the scanner locally:
 
-> **Note on Stubs**: If your tests use stubs/mocks (e.g. VCR cassettes), Plarix won't see any traffic, and cost will be $0. This is expected.
+1.  Results are written to `plarix-ledger.jsonl` in the current directory.
+2.  CLI Usage:
+    ```bash
+    go run ./cmd/plarix-scan run --command "curl -s http://.../v1/chat/completions"
+    ```
