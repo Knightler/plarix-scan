@@ -82,7 +82,7 @@ func (p *Prices) IsStale(maxAge time.Duration) bool {
 // StaleWarning returns a warning message if prices are stale.
 func (p *Prices) StaleWarning() string {
 	if p.IsStale(60 * 24 * time.Hour) { // 60 days
-		return fmt.Sprintf("⚠️ Pricing table may be stale (as_of: %s)", p.AsOf)
+		return fmt.Sprintf("Pricing table may be stale (as_of: %s)", p.AsOf)
 	}
 	return ""
 }

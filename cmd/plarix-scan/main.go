@@ -234,13 +234,13 @@ func runUserCommand(command string, envVars map[string]string) error {
 func generateReport(s ledger.Summary, pricesAsOf string) string {
 	var b strings.Builder
 
-	b.WriteString("## 💰 Plarix Scan Cost Report\n\n")
+	b.WriteString("## Plarix Scan Cost Report\n\n")
 	fmt.Fprintf(&b, "**Total Known Cost:** $%.4f USD\n", s.TotalKnownCostUSD)
 	fmt.Fprintf(&b, "**Calls Observed:** %d\n", s.TotalCalls)
 	fmt.Fprintf(&b, "**Tokens:** %d in / %d out\n\n", s.TotalInputTokens, s.TotalOutputTokens)
 
 	if s.UnknownCostCalls > 0 {
-		fmt.Fprintf(&b, "⚠️ **Unknown Cost Calls:** %d\n", s.UnknownCostCalls)
+		fmt.Fprintf(&b, "**Unknown Cost Calls:** %d\n", s.UnknownCostCalls)
 		if len(s.UnknownReasons) > 0 {
 			for reason, count := range s.UnknownReasons {
 				fmt.Fprintf(&b, "  - %s: %d\n", reason, count)
@@ -250,7 +250,7 @@ func generateReport(s ledger.Summary, pricesAsOf string) string {
 	}
 
 	if s.TotalCalls == 0 {
-		b.WriteString("ℹ️ No real provider calls observed. Tests may be stubbed.\n\n")
+		b.WriteString("No real provider calls observed. Tests may be stubbed.\n\n")
 	}
 
 	// Model breakdown table (top 6)
