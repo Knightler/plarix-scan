@@ -2,6 +2,15 @@
 
 All notable changes to Plarix Scan will be documented in this file.
 
+## [0.6.0] - 2026-01-04
+
+### Added
+- Docker support: `Dockerfile`, `docker-compose.yaml`, and `plarix-scan proxy` daemon mode
+- Real-time streaming token usage capture (stream_options injection support)
+- Upstream override support (PLARIX_UPSTREAM_*)
+- Pricing update (Jan 2026) with sources
+- Documentation overhaul (README, Go docs)
+
 ## [0.5.0] - 2026-01-03
 
 ### Added

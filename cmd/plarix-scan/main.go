@@ -22,7 +22,7 @@ import (
 	"plarix-action/internal/proxy"
 )
 
-const version = "0.4.0"
+const version = "0.6.0"
 
 func main() {
 	if len(os.Args) < 2 {
