@@ -10,10 +10,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"os/signal"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 
 	"plarix-action/internal/action"
@@ -36,11 +34,7 @@ func main() {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
-	case "proxy":
-		if err := runProxy(os.Args[2:]); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
-		}
+
 	case "version", "--version", "-v":
 		fmt.Printf("plarix-scan v%s\n", version)
 	case "help", "--help", "-h":
@@ -57,7 +51,7 @@ func printUsage() {
 
 Commands:
   run       Run a command with LLM API cost tracking
-  proxy     Start the proxy server in daemon mode
+
   version   Print version information
   help      Show this help message
 
@@ -69,11 +63,7 @@ Run Options:
   --comment <mode>     Comment mode: pr, summary, both (default: both)
   --enable-openai-stream-usage-injection <bool>   Opt-in for OpenAI stream usage (default: false)
 
-Proxy Options:
-  --port <int>         Port to listen on (default: 8080)
-  --pricing <path>     Path to custom pricing JSON
-  --ledger <path>      Path to ledger file (default: plarix-ledger.jsonl)
-  --providers <csv>    Providers to intercept (default: openai,anthropic,openrouter)`)
+`)
 }
 
 func runCmd(args []string) error {
@@ -205,78 +195,6 @@ func runCmd(args []string) error {
 		return fmt.Errorf("command failed: %w", cmdErr)
 	}
 
-	return nil
-}
-
-func runProxy(args []string) error {
-	fs := flag.NewFlagSet("proxy", flag.ExitOnError)
-
-	portFlag := fs.Int("port", 8080, "Port to listen on")
-	pricingPath := fs.String("pricing", "", "Path to custom pricing JSON")
-	ledgerPath := fs.String("ledger", "plarix-ledger.jsonl", "Path to ledger file")
-	providers := fs.String("providers", "openai,anthropic,openrouter", "Providers to intercept")
-
-	if err := fs.Parse(args); err != nil {
-		return err
-	}
-
-	// Load pricing
-	prices, err := loadPricing(*pricingPath)
-	if err != nil {
-		return fmt.Errorf("load pricing: %w", err)
-	}
-
-	// Create aggregator and writer
-	writer, err := ledger.NewWriter(*ledgerPath)
-	if err != nil {
-		return fmt.Errorf("create ledger writer: %w", err)
-	}
-	defer writer.Close()
-
-	// Start proxy
-	proxyConfig := proxy.Config{
-		Providers: strings.Split(*providers, ","),
-		OnEntry: func(e ledger.Entry) {
-			// Compute cost
-			if e.CostKnown && e.Model != "" {
-				result := prices.ComputeCost(e.Model, e.InputTokens, e.OutputTokens)
-				if result.Known {
-					e.CostUSD = result.CostUSD
-				} else {
-					e.CostKnown = false
-					e.UnknownReason = result.UnknownReason
-				}
-			}
-
-			// Record
-			// In proxy mode, we might just log to stdout as well
-			fmt.Printf("Recorded call: %s %s tokens=%d/%d cost=$%.4f\n",
-				e.Provider, e.Model, e.InputTokens, e.OutputTokens, e.CostUSD)
-
-			if err := writer.Write(e); err != nil {
-				fmt.Fprintf(os.Stderr, "Warning: failed to write ledger entry: %v\n", err)
-			}
-		},
-	}
-
-	// Start proxy
-	server := proxy.NewServer(proxyConfig)
-	actualPort, err := server.StartOn(*portFlag)
-	if err != nil {
-		return fmt.Errorf("start proxy: %w", err)
-	}
-	defer server.Stop()
-
-	fmt.Printf("Plarix proxy running on port %d\n", actualPort)
-	fmt.Printf("Ledger: %s\n", *ledgerPath)
-	fmt.Println("Press Ctrl+C to stop...")
-
-	// Wait for signal
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
-	<-sigChan
-
-	fmt.Println("\nShutting down...")
 	return nil
 }
 

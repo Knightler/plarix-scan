@@ -60,15 +60,9 @@ func NewServer(config Config) *Server {
 	return s
 }
 
-// Start begins listening on a random available port.
+// Start begins listening on a random available port on localhost.
 // Returns the port number.
 func (s *Server) Start() (int, error) {
-	return s.StartOn(0)
-}
-
-// StartOn begins listening on the specified port.
-// If port is 0, a random port is chosen.
-func (s *Server) StartOn(port int) (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -77,28 +71,18 @@ func (s *Server) StartOn(port int) (int, error) {
 	}
 
 	var err error
-	addr := fmt.Sprintf("127.0.0.1:%d", port)
-	// For Docker (proxy mode), we might want to listen on all interfaces (0.0.0.0)
-	// But current default was 127.0.0.1.
-	// If port is specified (non-zero), assume we might want external access?
-	// The user request says "mounts a volume... exposes a port".
-	// If we bind 127.0.0.1 in Docker, it won't be accessible from host unless using host network.
-	// We should default to 0.0.0.0 if port != 0? Or just change default binding.
-	if port != 0 {
-		addr = fmt.Sprintf("0.0.0.0:%d", port)
-	}
-
-	s.listener, err = net.Listen("tcp", addr)
+	// Always bind to localhost for Action security
+	s.listener, err = net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return 0, fmt.Errorf("listen: %w", err)
 	}
 
-	actualPort := s.listener.Addr().(*net.TCPAddr).Port
+	port := s.listener.Addr().(*net.TCPAddr).Port
 	s.started = true
 
 	go s.httpServer.Serve(s.listener)
 
-	return actualPort, nil
+	return port, nil
 }
 
 // Stop shuts down the server.
