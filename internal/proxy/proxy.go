@@ -152,6 +152,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			req.URL.Host = targetURL.Host
 			req.URL.Path = targetPath
 			req.Host = targetURL.Host
+			// Strip Accept-Encoding to avoid upstream compression (gzip/brotli).
+			// We need to parse the JSON body, and handling decompression manually is complex/error-prone.
+			// By removing this, upstream will assume we only speak identity (plaintext).
+			req.Header.Del("Accept-Encoding")
 		},
 		ModifyResponse: func(resp *http.Response) error {
 			return s.handleResponse(provider, targetPath, resp)
