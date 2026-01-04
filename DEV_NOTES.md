@@ -1,10 +1,6 @@
-# Dev Notes
+# Dev Notes (2026-01-04)
 
-**Date**: Jan 4, 2026
-**Goal**: Hardening + Docker + Pricing Refresh + Docs
-
-## Objective
-Make plarix-scan production-grade for real projects:
-- Accurate real-time recording of LLM usage + costs based on provider-reported usage fields.
-- Clear documentation.
-- Dockerized runtime option.
+Action-only hardening pass.
+Goal: A purely CI-focused cost recorder (GitHub Action).
+Scope: Remove production proxy/sidecar features. Ensure 100% accuracy on usage.
+Constraint: No price guessing, strict ledger recording.
